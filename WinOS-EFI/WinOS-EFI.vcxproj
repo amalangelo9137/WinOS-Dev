@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BaseThings\BMPParser.c" />
+    <ClCompile Include="BaseThings\Files.c" />
+    <ClCompile Include="BaseThings\Graphics.c" />
+    <ClCompile Include="BaseThings\Mouse.c" />
+    <ClCompile Include="main.c" />
+    <ClCompile Include="Utils.c">
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BaseThings\BMPParser.h" />
+    <ClInclude Include="BaseThings\Files.h" />
+    <ClInclude Include="BaseThings\Graphics.h" />
+    <ClInclude Include="BaseThings\Mouse.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="WinOS-Logo.png" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{863F20AB-344D-48FD-9982-15EF853EBF2E}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(SolutionDir)\WinOS.default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(SolutionDir)\WinOS.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>UefiApplicationEntryPoint.lib;UefiLib.lib;BaseLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>EFI Application</SubSystem>
+    </Link>
+    <ClCompile>
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level4</WarningLevel>
+      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</TreatWarningAsError>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
