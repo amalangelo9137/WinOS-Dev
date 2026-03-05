@@ -11,16 +11,19 @@
     <ClCompile Include="BaseThings\Files.c" />
     <ClCompile Include="BaseThings\Graphics.c" />
     <ClCompile Include="BaseThings\Mouse.c" />
-    <ClCompile Include="main.c" />
+    <ClCompile Include="efiMain.c" />
+    <ClCompile Include="Fonts\stb_truetype_impl.c" />
     <ClCompile Include="Utils.c">
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Shared.h" />
     <ClInclude Include="BaseThings\BMPParser.h" />
     <ClInclude Include="BaseThings\Files.h" />
     <ClInclude Include="BaseThings\Graphics.h" />
     <ClInclude Include="BaseThings\Mouse.h" />
+    <ClInclude Include="Fonts\stb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="WinOS-Logo.png" />
@@ -42,6 +45,11 @@
     <ClCompile>
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level4</WarningLevel>
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</TreatWarningAsError>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <PostBuildEvent>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del "$(SolutionDir)\..\VirtualDrive\EFI\BOOT\BOOTX64.EFI"
+copy "$(SolutionDir)\x64\Release\WinOS-EFI.efi" "$(SolutionDir)\..\VirtualDrive\EFI\BOOT\BOOTX64.EFI"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
 </Project>
