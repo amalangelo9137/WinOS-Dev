@@ -1,14 +1,13 @@
-; GDT-assembly.asm (MASM / ml64 syntax)
-
-PUBLIC LoadGDT
-
+; MASM 64-bit syntax
 .code
 
-LoadGDT PROC
-    ; RCX contains the GDT_Descriptor pointer
+public LoadGDT
+
+LoadGDT proc
+    ; 1. Load the GDT Pointer from RCX (1st argument in MSVC x64 calling convention)
     lgdt fword ptr [rcx]
 
-    ; 1. Load Data Segments
+    ; 2. Reload Data Segments to 0x10 (Kernel Data Index)
     mov ax, 10h
     mov ds, ax
     mov es, ax
@@ -16,15 +15,21 @@ LoadGDT PROC
     mov gs, ax
     mov ss, ax
 
-    ; 2. Reload CS via far return
-    mov rax, 08h
-    push rax            ; selector
-    lea rax, [f_flush]  ; return address
-    push rax
-    db 48h, 0CBh
+    ; 3. Reload Code Segment (CS) to 0x08 (Kernel Code Index)
+    ; We must do a Far Return to update CS in 64-bit mode.
+    
+    ; Get return address currently at the top of the stack
+    mov rax, qword ptr [rsp] 
+    
+    ; Overwrite the stack top with our new CS (0x08)
+    mov r8, 08h             
+    mov qword ptr [rsp], r8 
+    
+    ; Push the return address back on top of the new CS
+    push rax                
 
-f_flush:
-    ret
-LoadGDT ENDP
+    ; Execute Far Return (REX.W + RETF) to pop the Instruction Pointer and the new CS
+    db 48h, 0cbh            
+LoadGDT endp
 
-END
+end

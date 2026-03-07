@@ -1,22 +1,27 @@
 #pragma once
 #include <stdint.h>
 
-typedef struct {
-    uint32_t* FrameBufferBase;
-    uint64_t  FrameBufferSize;
-    uint32_t  HorizontalResolution;
-    uint32_t  VerticalResolution;
-    uint32_t  PixelsPerScanLine;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-    // Handover Sprite: Cursor
-    uint32_t* LogonMousePixels;
-    uint32_t  MouseW;
-	uint32_t MouseSensitivity;
-    uint32_t  MouseH;
+#pragma pack(push, 1)
+    typedef struct {
+        unsigned char Magic[2];     // 0x36, 0x04
+        unsigned char Mode;         // 0 = 256 chars, 1 = 512 chars
+        unsigned char CharSize;     // Height of character in pixels
+    } PSF1_HEADER;
 
-    // Handover Sprite: Font Atlas
-    uint32_t* FontSpriteData;   // Points to the 512x512 BMP pixels
-    uint32_t  FontSpriteWidth;  // 512
-    uint32_t  FontSpriteHeight; // 512
-    uint32_t  FontGlyphSize;    // 32 (size of the square in the grid)
-} BOOT_CONFIG;
+    typedef struct {
+        uint32_t* BaseAddress;
+        uint64_t  BufferSize;
+        uint32_t  Width;
+        uint32_t  Height;
+        uint32_t  PixelsPerScanLine;
+        PSF1_HEADER* Font;          // <--- Added this field
+    } BOOT_CONFIG;
+#pragma pack(pop)
+
+#ifdef __cplusplus
+}
+#endif

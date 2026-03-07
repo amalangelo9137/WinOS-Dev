@@ -2,20 +2,21 @@
 #include <stdint.h>
 
 #pragma pack(push, 1)
-typedef struct {
-	uint16_t    BaseLow;    // Lower 16 bits of handler address
-	uint16_t    Selector;   // Your Kernel Code Segment (0x08 from GDT!)
-	uint8_t     IST;        // Interrupt Stack Table (set to 0 for now)
-	uint8_t     TypeAttr;   // Gate Type and Attributes
-	uint16_t    BaseMid;    // Middle 16 bits of address
-	uint32_t    BaseHigh;   // Upper 32 bits of address
-	uint32_t    Reserved;   // Always 0
-} IDT_Entry;
+struct IDTEntry {
+    uint16_t OffsetLow;
+    uint16_t Selector;
+    uint8_t  IST;
+    uint8_t  Attributes;
+    uint16_t OffsetMid;
+    uint32_t OffsetHigh;
+    uint32_t Reserved;
+};
 
-typedef struct {
-	uint16_t Limit;
-	uint64_t Base;
-} IDTR;
+struct IDTDescriptor {
+    uint16_t Limit;
+    uint64_t Address;
+};
 #pragma pack(pop)
 
 void InitIDT();
+extern "C" void LoadIDT(IDTDescriptor* idtDescriptor);

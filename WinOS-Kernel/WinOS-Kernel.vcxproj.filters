@@ -15,78 +15,30 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="kernelMain.c">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CrucialInternals\GDT.c">
+    <ClCompile Include="Console\Console.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CrucialInternals\IDT.c">
+    <ClCompile Include="CrucialInternals\GDT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HIDs\Mouse.c">
+    <ClCompile Include="CrucialInternals\IDT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HIDs\Keyboard.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UI\Compositor.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CrucialInternals\KernelHeap.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="WFS\WFS.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utils.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UI\nuklear_backend.c">
+    <ClCompile Include="HIDs\Drivers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Shared.h">
+    <ClInclude Include="Console\Console.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CrucialInternals\GDT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CrucialInternals\IDT.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="HIDs\Mouse.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="HIDs\Keyboard.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="UI\Compositor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="UI\Font.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CrucialInternals\KernelHeap.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="UI\nuklear.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="WFS\WFS.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -97,19 +49,5 @@
     <MASM Include="CrucialInternals\IDT-assembly.asm">
       <Filter>Source Files</Filter>
     </MASM>
-    <MASM Include="CrucialInternals\Interrupts.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
-    <MASM Include="CrucialInternals\FastCopy.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
-    <MASM Include="GrabStuff\MouseIcon.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="WinOS-Kernel.rc">
-      <Filter>Resource Files</Filter>
-    </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -1,12 +1,33 @@
 #pragma once
 #include <stdint.h>
 
+// MSVC way to force 1-byte alignment (no padding)
 #pragma pack(push, 1)
-typedef struct {
-    uint16_t Limit; // Size of the table minus 1
-    uint64_t Base;  // Memory address of the table
-} GDT_Descriptor;
+
+struct GDTEntry {
+    uint16_t LimitLow;
+    uint16_t BaseLow;
+    uint8_t  BaseMiddle;
+    uint8_t  Access;
+    uint8_t  Flags;
+    uint8_t  BaseHigh;
+};
+
+struct GDTDescriptor {
+    uint16_t Size;
+    uint64_t Offset;
+};
+
+struct GDTTable {
+    GDTEntry Null;         // Offset 0x00
+    GDTEntry KernelCode;   // Offset 0x08
+    GDTEntry KernelData;   // Offset 0x10
+    GDTEntry UserData;     // Offset 0x18
+    GDTEntry UserCode;     // Offset 0x20
+};
+
+// Restore default compiler alignment
 #pragma pack(pop)
 
-// Our function to set it up
+extern "C" void LoadGDT(GDTDescriptor* gdtDescriptor);
 void InitGDT();
