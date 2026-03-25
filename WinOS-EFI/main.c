@@ -1,140 +1,171 @@
+// Standard EDK2/VisualUefi Includes
 #include <Uefi.h>
 #include <Library/UefiLib.h>
-#include <Library/BaseMemoryLib.h>
-#include <Library/MemoryAllocationLib.h>
 #include <Library/UefiBootServicesTableLib.h>
-#include <IndustryStandard/PeImage.h>
-#include <Protocol/SimpleFileSystem.h>
+#include <Library/MemoryAllocationLib.h>
 #include <Protocol/LoadedImage.h>
+#include <Protocol/SimpleFileSystem.h>
+#include <Protocol/GraphicsOutput.h>
+#include <Guid/FileInfo.h>
+
 #include "Shared.h"
 
 extern CONST UINT32 _gUefiDriverRevision = 0;
 CHAR8* gEfiCallerBaseName = "WinOS-Dev";
 
-typedef void(__cdecl* KERNEL_ENTRY)(BOOT_CONFIG*);
+// =========================================================================
+// HELPER 1: Load a file from the USB into RAM
+// =========================================================================
+void* LoadFileIntoRAM(EFI_FILE* Directory, CHAR16* Path) {
+    EFI_FILE* LoadedFile;
+    EFI_STATUS Status = Directory->Open(Directory, &LoadedFile, Path, EFI_FILE_MODE_READ, 0);
 
-// Helper to load the kernel file into memory
-VOID* LoadKernelFile(EFI_HANDLE ImageHandle, CHAR16* FileName) {
-    EFI_STATUS Status;
-    EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
-    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* FileSystem;
-    EFI_FILE_PROTOCOL* Root;
-    EFI_FILE_PROTOCOL* File;
-    VOID* Buffer = NULL;
+    if (EFI_ERROR(Status)) {
+        Print(L"[!] Error opening %s: %r\n", Path, Status);
+        return NULL;
+    }
 
-    gBS->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (VOID**)&LoadedImage);
-    gBS->HandleProtocol(LoadedImage->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid, (VOID**)&FileSystem);
-    FileSystem->OpenVolume(FileSystem, &Root);
+    // 1. Get File Size
+    EFI_FILE_INFO* FileInfo = NULL;
+    UINTN FileInfoSize = 0;
+    LoadedFile->GetInfo(LoadedFile, &gEfiFileInfoGuid, &FileInfoSize, NULL);
+    gBS->AllocatePool(EfiLoaderData, FileInfoSize, (void**)&FileInfo);
+    LoadedFile->GetInfo(LoadedFile, &gEfiFileInfoGuid, &FileInfoSize, (void**)&FileInfo);
 
-    Status = Root->Open(Root, &File, FileName, EFI_FILE_MODE_READ, 0);
-    if (EFI_ERROR(Status)) return NULL;
+    UINTN FileSize = FileInfo->FileSize;
+    gBS->FreePool(FileInfo);
 
-    // Get file size
-    UINTN FileSize = 0;
-    File->SetPosition(File, 0xFFFFFFFFFFFFFFFFULL);
-    File->GetPosition(File, &FileSize);
-    File->SetPosition(File, 0);
+    if (FileSize == 0) {
+        Print(L"[!] File %s is empty!\n", Path);
+        return NULL;
+    }
 
-    // Read the headers first to find out how much memory the IMAGE actually needs
-    EFI_IMAGE_DOS_HEADER DosHdr;
-    UINTN Size = sizeof(DosHdr);
-    File->Read(File, &Size, &DosHdr);
+    // 2. Calculate Pages (1 Page = 4096 bytes)
+    UINTN NumPages = (FileSize + 4095) / 4096;
+    EFI_PHYSICAL_ADDRESS FileBufferAddr;
 
-    EFI_IMAGE_NT_HEADERS64 NtHdr;
-    File->SetPosition(File, DosHdr.e_lfanew);
-    Size = sizeof(NtHdr);
-    File->Read(File, &Size, &NtHdr);
+    // 3. Allocate Pages directly from RAM
+    Status = gBS->AllocatePages(AllocateAnyPages, EfiRuntimeServicesData, NumPages, &FileBufferAddr);
 
-    // CRITICAL FIX: Allocate SizeOfImage, not FileSize
-    UINTN ImageSize = NtHdr.OptionalHeader.SizeOfImage;
-    gBS->AllocatePool(EfiLoaderData, ImageSize, &Buffer);
+    if (EFI_ERROR(Status)) {
+        Print(L"[!] Failed to allocate %d pages for %s: %r\n", NumPages, Path, Status);
+        return NULL;
+    }
 
-    // Zero out the whole buffer first to handle BSS automatically
-    SetMem(Buffer, ImageSize, 0);
+    void* FileBuffer = (void*)FileBufferAddr;
 
-    // Read the raw file into the start of the buffer
-    File->SetPosition(File, 0);
-    File->Read(File, &FileSize, Buffer);
+    // 4. Read the data
+    Status = LoadedFile->Read(LoadedFile, &FileSize, FileBuffer);
+    if (EFI_ERROR(Status)) {
+        Print(L"[!] Failed to read %s: %r\n", Path, Status);
+        gBS->FreePages(FileBufferAddr, NumPages);
+        return NULL;
+    }
 
-    File->Close(File);
-    return Buffer;
+    LoadedFile->Close(LoadedFile);
+    Print(L"[+] Loaded %s at 0x%llx (%d bytes)\n", Path, FileBufferAddr, FileSize);
+    return FileBuffer;
 }
 
-EFI_STATUS EFIAPI UefiMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
-    EFI_STATUS Status;
+// =========================================================================
+// HELPER 2: Initialize the Screen (Graphics Output Protocol)
+// =========================================================================
+EFI_GRAPHICS_OUTPUT_PROTOCOL* InitGraphics() {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP;
+    EFI_STATUS Status = gBS->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (void**)&GOP);
+
+    if (EFI_ERROR(Status)) {
+        Print(L"[!] Failed to locate GOP (Graphics Protocol)\n");
+        return NULL;
+    }
+
+    Print(L"[+] Graphics Initialized. Resolution: %dx%d\n",
+        GOP->Mode->Info->HorizontalResolution,
+        GOP->Mode->Info->VerticalResolution);
+
+    return GOP;
+}
+
+// =========================================================================
+// MAIN ENTRY POINT
+// =========================================================================
+EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* SystemTable) {
+    // Clear the screen
+    gST->ConOut->ClearScreen(gST->ConOut);
+    Print(L"=== Starting WinOS Bootloader ===\n");
 
     // 1. Setup Graphics
-    EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
-    Status = gBS->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID**)&gop);
-    if (EFI_ERROR(Status)) return Status;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL* GOP = InitGraphics();
+    if (!GOP) return EFI_UNSUPPORTED;
 
-    BOOT_CONFIG config = {
-        (uint32_t*)gop->Mode->FrameBufferBase,
-        gop->Mode->FrameBufferSize,
-        gop->Mode->Info->HorizontalResolution,
-        gop->Mode->Info->VerticalResolution,
-        gop->Mode->Info->PixelsPerScanLine,
-        NULL
-    };
+    // 2. Access the USB Drive (File System)
+    EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
+    gBS->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (void**)&LoadedImage);
 
-    // 2. Load Kernel raw binary
-    VOID* KernelBuffer = LoadKernelFile(ImageHandle, L"KERNEL");
-    if (KernelBuffer == NULL) {
-        Print(L"WHERE TF IS THE KERNEL\n");
-        return EFI_NOT_FOUND;
-    }
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* FileSystem;
+    gBS->HandleProtocol(LoadedImage->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid, (void**)&FileSystem);
 
-    VOID* FontBuffer = LoadKernelFile(ImageHandle, L"OSRESOURCES\\kernelFont.psf");
-    if (FontBuffer == NULL) {
-        Print(L"bro place the font at the OSRESOURCES directory :) (name it kernelFont)\n");
-		return EFI_NOT_FOUND;
-    }
-    config.Font = (PSF1_HEADER*)FontBuffer;
-        
-    // 3. PE Parsing & Section Mapping
-    EFI_IMAGE_DOS_HEADER* DosHdr = (EFI_IMAGE_DOS_HEADER*)KernelBuffer;
-    EFI_IMAGE_NT_HEADERS64* NtHdr = (EFI_IMAGE_NT_HEADERS64*)((UINT8*)KernelBuffer + DosHdr->e_lfanew);
-    EFI_IMAGE_SECTION_HEADER* Section = (EFI_IMAGE_SECTION_HEADER*)((UINT8*)&NtHdr->OptionalHeader + NtHdr->FileHeader.SizeOfOptionalHeader);
+    EFI_FILE* RootDir;
+    FileSystem->OpenVolume(FileSystem, &RootDir);
 
-    for (UINT16 i = 0; i < NtHdr->FileHeader.NumberOfSections; i++) {
-        UINT8* Dest = (UINT8*)KernelBuffer + Section[i].VirtualAddress;
-        UINT8* Src = (UINT8*)KernelBuffer + Section[i].PointerToRawData;
+    // 3. Load UI Assets into RAM
+    void* CursorBuffer = LoadFileIntoRAM(RootDir, L"OSRESOURCES\\Cursor-Normal.bmp");
+    void* WallpaperBuffer = LoadFileIntoRAM(RootDir, L"OSRESOURCES\\WinOS-BG.bmp");
 
-        if (Section[i].SizeOfRawData > 0) {
-            CopyMem(Dest, Src, Section[i].SizeOfRawData);
-        }
+    // Load and format the PSF1 Font
+    void* FontFileBuffer = LoadFileIntoRAM(RootDir, L"OSRESOURCES\\kernelFont.psf");
+    PSF1_FONT* SystemFont;
+    gBS->AllocatePool(EfiLoaderData, sizeof(PSF1_FONT), (void**)&SystemFont);
+    SystemFont->psf1_Header = FontFileBuffer;
+    SystemFont->glyphBuffer = (void*)((UINT8*)FontFileBuffer + 4); // Skip 4-byte header
 
-        // Fix for .Misc.VirtualSize (The BSS section)
-        if (Section[i].Misc.VirtualSize > Section[i].SizeOfRawData) {
-            SetMem((UINT8*)Dest + Section[i].SizeOfRawData, Section[i].Misc.VirtualSize - Section[i].SizeOfRawData, 0);
-        }
-    }
+    // 4. Allocate the BackBuffer (For flicker-free rendering later)
+    UINTN BackBufferSize = GOP->Mode->Info->PixelsPerScanLine * GOP->Mode->Info->VerticalResolution * sizeof(uint32_t);
+    UINTN BackBufferPages = (BackBufferSize + 4095) / 4096;
+    EFI_PHYSICAL_ADDRESS BackBufferAddr;
 
-    // 4. Memory Map & Exit Boot Services
-    UINTN MapSize = 0;
-    UINTN MapKey, DescriptorSize;
-    UINT32 DescriptorVersion;
-    EFI_MEMORY_DESCRIPTOR* MMap = NULL;
+    gBS->AllocatePages(AllocateAnyPages, EfiRuntimeServicesData, BackBufferPages, &BackBufferAddr);
 
-    // Get the buffer size needed
-    gBS->GetMemoryMap(&MapSize, NULL, &MapKey, &DescriptorSize, &DescriptorVersion);
-    MapSize += (2 * DescriptorSize); // Add some padding
-    gBS->AllocatePool(EfiLoaderData, MapSize, (VOID**)&MMap);
+    void* BackBuffer = (void*)BackBufferAddr;
 
-    // Get the actual map
-    Status = gBS->GetMemoryMap(&MapSize, MMap, &MapKey, &DescriptorSize, &DescriptorVersion);
-    if (EFI_ERROR(Status)) return Status;
+    // Allocate Mouse State
+    MOUSE_STATE* MouseState;
+    gBS->AllocatePool(EfiLoaderData, sizeof(MOUSE_STATE), (void**)&MouseState);
+    MouseState->X = GOP->Mode->Info->HorizontalResolution / 2; // Start mouse in center
+    MouseState->Y = GOP->Mode->Info->VerticalResolution / 2;
+    MouseState->Left = false;
+    MouseState->Right = false;
 
-    Status = gBS->ExitBootServices(ImageHandle, MapKey);
-    if (EFI_ERROR(Status)) return Status;
+    // 5. Build the BOOT_CONFIG payload
+    BOOT_CONFIG BootConfig;
+    BootConfig.BaseAddress = (uint32_t*)GOP->Mode->FrameBufferBase;
+    BootConfig.BackBuffer = (uint32_t*)BackBuffer;
+    BootConfig.Width = GOP->Mode->Info->HorizontalResolution;
+    BootConfig.Height = GOP->Mode->Info->VerticalResolution;
+    BootConfig.PixelsPerScanLine = GOP->Mode->Info->PixelsPerScanLine;
 
-    // 5. Jump to Kernel
-    KERNEL_ENTRY KernelMain = (KERNEL_ENTRY)((UINTN)KernelBuffer + NtHdr->OptionalHeader.AddressOfEntryPoint);
-    KernelMain(&config);
+    BootConfig.Mouse = MouseState;
+    BootConfig.CursorBMP = CursorBuffer;
+    BootConfig.WallpaperBMP = WallpaperBuffer;
+    BootConfig.Font = SystemFont;
+
+    Print(L"[+] BOOT_CONFIG payload assembled.\n");
+
+    // =========================================================================
+    // TODO NEXT: 
+    // 1. Load the Kernel File (kernel.elf or kernel.bin) into RAM
+    // 2. Get the Memory Map
+    // 3. Call gBS->ExitBootServices()
+    // 4. Jump to the Kernel Entry Point passing &BootConfig
+    // =========================================================================
+
+    // Halt for now so you can see the print statements
+    while (1) {}
 
     return EFI_SUCCESS;
 }
 
-EFI_STATUS EFIAPI UefiUnload(IN EFI_HANDLE ImageHandle) {
-    return EFI_SUCCESS;
+EFI_STATUS EFIAPI UefiUnload()
+{
+	return EFI_SUCCESS;
 }

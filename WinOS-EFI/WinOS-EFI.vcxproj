@@ -30,8 +30,7 @@
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
     </ClCompile>
     <PostBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-      </Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy $(SolutionDir)\x64\Release\WinOS-EFI.efi $(SolutionDir)\Run\VirtualDrive\EFI\BOOT\BOOTX64.EFI</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
 </Project>

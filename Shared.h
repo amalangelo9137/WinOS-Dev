@@ -1,27 +1,31 @@
 #pragma once
 #include <stdint.h>
+#include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// The state of the mouse (Kernel will update this later)
+typedef struct {
+    int X, Y;
+    bool Left, Right;
+} MOUSE_STATE;
 
-#pragma pack(push, 1)
-    typedef struct {
-        unsigned char Magic[2];     // 0x36, 0x04
-        unsigned char Mode;         // 0 = 256 chars, 1 = 512 chars
-        unsigned char CharSize;     // Height of character in pixels
-    } PSF1_HEADER;
+// The font format for your terminal
+typedef struct {
+    void* psf1_Header;
+    void* glyphBuffer;
+} PSF1_FONT;
 
-    typedef struct {
-        uint32_t* BaseAddress;
-        uint64_t  BufferSize;
-        uint32_t  Width;
-        uint32_t  Height;
-        uint32_t  PixelsPerScanLine;
-        PSF1_HEADER* Font;          // <--- Added this field
-    } BOOT_CONFIG;
-#pragma pack(pop)
+// The ultimate package handed from EFI to the Kernel
+typedef struct {
+    uint32_t* BaseAddress;       // The actual screen pixels (Front Buffer)
+    uint32_t* BackBuffer;        // The hidden drawing canvas (Double Buffer)
+    uint32_t Width;              // Screen Width (e.g., 1920)
+    uint32_t Height;             // Screen Height (e.g., 1080)
+    uint32_t PixelsPerScanLine;  // Padding (sometimes wider than Width)
 
-#ifdef __cplusplus
-}
-#endif
+    MOUSE_STATE* Mouse;
+
+    // RAM Addresses of your loaded assets
+    void* CursorBMP;
+    void* WallpaperBMP;
+    PSF1_FONT* Font;
+} BOOT_CONFIG;
