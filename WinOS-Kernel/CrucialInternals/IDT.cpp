@@ -1,36 +1,51 @@
-#include "IDT.h"
-#include <intrin.h>
+#include <stdint.h>
 
-// 4KB alignment for stability
-__declspec(align(4096)) IDTEntry idt[256];
+#pragma pack(push, 1)
+struct IDTEntry {
+    uint16_t Offset0;
+    uint16_t Selector;
+    uint8_t IST;
+    uint8_t Type_Attr;
+    uint16_t Offset1;
+    uint32_t Offset2;
+    uint32_t Ignore;
+};
 
-// Assembly stubs declared in idt.asm
-extern "C" void isr6();  // Invalid Opcode safety net
-extern "C" void isr33(); // Keyboard
-extern "C" void isr44(); // Mouse
+struct IDTR {
+    uint16_t Limit;
+    uint64_t Offset;
+};
+#pragma pack(pop)
 
-void SetIDTGate(int vector, void* handler, uint16_t selector, uint8_t attributes) {
-    uint64_t addr = (uint64_t)handler;
-    idt[vector].OffsetLow = (uint16_t)(addr & 0xFFFF);
-    idt[vector].Selector = selector; // Kernel Code Segment (0x08)
-    idt[vector].IST = 0;
-    idt[vector].Attributes = attributes;
-    idt[vector].OffsetMid = (uint16_t)((addr >> 16) & 0xFFFF);
-    idt[vector].OffsetHigh = (uint32_t)((addr >> 32) & 0xFFFFFFFF);
-    idt[vector].Reserved = 0;
+IDTEntry idt[256];
+IDTR idtr;
+
+extern "C" void LoadIDT(IDTR* idtPtr);
+extern "C" void isr33(); // Keyboard MASM stub
+extern "C" void isr44(); // Mouse MASM stub
+
+void SetIDTGate(void* handler, uint8_t entryOffset, uint8_t type_attr, uint8_t selector) {
+    uint64_t offset = (uint64_t)handler;
+    idt[entryOffset].Offset0 = (uint16_t)(offset & 0x0000FFFF);
+    idt[entryOffset].Selector = selector;
+    idt[entryOffset].IST = 0;
+    idt[entryOffset].Type_Attr = type_attr;
+    idt[entryOffset].Offset1 = (uint16_t)((offset & 0xFFFF0000) >> 16);
+    idt[entryOffset].Offset2 = (uint32_t)((offset & 0xFFFFFFFF00000000) >> 32);
+    idt[entryOffset].Ignore = 0;
 }
 
-void InitIDT() {
-    // 0x8E = Present, Ring 0, Interrupt Gate
-    SetIDTGate(6, (void*)isr6, 0x08, 0x8E);
-    SetIDTGate(33, (void*)isr33, 0x08, 0x8E); // IRQ 1
-    SetIDTGate(44, (void*)isr44, 0x08, 0x8E); // IRQ 12
+extern "C" void InitIDT() {
+    idtr.Limit = sizeof(idt) - 1;
+    idtr.Offset = (uint64_t)&idt[0];
 
-    IDTDescriptor idtr;
-    idtr.Limit = (sizeof(IDTEntry) * 256) - 1;
-    idtr.Address = (uint64_t)&idt;
+    for (int i = 0; i < 256; i++) {
+        SetIDTGate((void*)0, i, 0x8E, 0x08);
+    }
+
+    // Map the hardware interrupts
+    SetIDTGate((void*)isr33, 33, 0x8E, 0x08);
+    SetIDTGate((void*)isr44, 44, 0x8E, 0x08);
 
     LoadIDT(&idtr);
-
-	_enable(); // Enable interrupts after loading IDT
 }

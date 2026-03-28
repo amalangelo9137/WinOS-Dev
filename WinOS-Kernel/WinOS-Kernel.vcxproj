@@ -39,7 +39,6 @@
     <ClInclude Include="Rendering\Renderer.h" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="CrucialInternals\GDT-assembly.asm" />
     <MASM Include="CrucialInternals\IDT-assembly.asm" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
