@@ -23,12 +23,19 @@
     <ClCompile Include="CrucialInternals\GDT.cpp" />
     <ClCompile Include="CrucialInternals\IDT.cpp" />
     <ClCompile Include="HIDs\Drivers.cpp" />
+    <ClCompile Include="InitFS\Assets.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Rendering\Bitmap.cpp" />
+    <ClCompile Include="Rendering\Shapes.cpp" />
+    <ClCompile Include="Rendering\Text.cpp" />
+    <ClCompile Include="Rendering\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Console\Console.h" />
     <ClInclude Include="CrucialInternals\GDT.h" />
     <ClInclude Include="CrucialInternals\IDT.h" />
+    <ClInclude Include="InitFS\Assets.h" />
+    <ClInclude Include="Rendering\Renderer.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="CrucialInternals\GDT-assembly.asm" />

@@ -1,3 +1,4 @@
+#include "Shared.h"
 #include "Console.h"
 
 // Initialize static members

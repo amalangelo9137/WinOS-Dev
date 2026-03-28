@@ -1,10 +1,19 @@
 #include "Shared.h"
-#include "Console\Console.h"
+#include "Console/Console.h"
+#include "InitFS/Assets.h"
+#include "Rendering/Renderer.h"
+#include "CrucialInternals/GDT.h"
+#include "CrucialInternals/IDT.h"
 #include <intrin.h>
-#include "CrucialInternals\GDT.h"
-#include "CrucialInternals\IDT.h"
 
 extern "C" void RemapPIC();
+
+void SwitchBuffer(BOOT_CONFIG* config) {
+    uint32_t screenCount = config->Width * config->Height;
+    for (uint32_t i = 0; i < screenCount; i++) {
+        config->BaseAddress[i] = config->BackBuffer[i];
+    }
+}
 
 // Marks the function as the entry point in the PE header
 extern "C" __declspec(dllexport) void KernelMain(BOOT_CONFIG* config) {
@@ -28,22 +37,35 @@ extern "C" __declspec(dllexport) void KernelMain(BOOT_CONFIG* config) {
 	Console::Clear(0x000000);
 
     // 2. Hello World Square: Bright Green
-    uint32_t centerX = width / 2;
-    uint32_t centerY = height / 2;
-    uint32_t size = 50;
+    //uint32_t centerX = width / 2;
+    //uint32_t centerY = height / 2;
+    //uint32_t size = 50;
 
-    for (uint32_t y = centerY - size; y < centerY + size; y++) {
-        for (uint32_t x = centerX - size; x < centerX + size; x++) {
-            fb[x + (y * pps)] = 0x00FF00;
-        }
+    //for (uint32_t y = centerY - size; y < centerY + size; y++) {
+    //    for (uint32_t x = centerX - size; x < centerX + size; x++) {
+    //        fb[x + (y * pps)] = 0x00FF00;
+    //    }
+    //}
+    
+    void* bg = GetAsset("BACKGROUND", config);
+    if (bg) {
+        Console::Print("BACKGROUND found at address! Drawing...\n", 0x00FF00);
+        DrawBMP(bg, 0, 0, config->Width, config->Height, config);
     }
+    else {
+        Console::Print("Error: LOGO asset not found in Table!\n", 0xFF0000);
+        // Print how many assets were actually loaded to debug
+        // Console::PrintNumber(config->Assets->Count); 
+    }
+
+    DrawWindow("WinOS-Dev : Test Window", 50, 50, 400, 300, config);
+
+    SwitchBuffer(config);
 
     // Inside KernelMain after clearing the screen
     Console::Print("WinOS Kernel Loaded!\n", 0xFFFFFF);
     Console::Print("PE Image Mapping: Success\n", 0x00FF00);
 
     // Final infinite loop
-    while (true) {
-        __halt();
-    }
+    while (true) __halt();
 }
