@@ -26,6 +26,7 @@
     <ClCompile Include="InitFS\Assets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\Bitmap.cpp" />
+    <ClCompile Include="Rendering\Renderer.cpp" />
     <ClCompile Include="Rendering\Shapes.cpp" />
     <ClCompile Include="Rendering\Text.cpp" />
     <ClCompile Include="Rendering\Window.cpp" />
@@ -38,7 +39,6 @@
     <ClInclude Include="Rendering\Renderer.h" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="CrucialInternals\GDT-assembly.asm" />
     <MASM Include="CrucialInternals\IDT-assembly.asm" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -26,7 +26,7 @@ struct GDTTable {
     GDTEntry UserCode;     // Offset 0x20
 };
 
-// Restore default compiler alignment
+// Restore defa ult compiler alignment
 #pragma pack(pop)
 
 extern "C" void LoadGDT(GDTDescriptor* gdtDescriptor);

@@ -45,6 +45,9 @@
     <ClCompile Include="Rendering\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Rendering\Renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Console\Console.h">
@@ -64,9 +67,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="CrucialInternals\GDT-assembly.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
     <MASM Include="CrucialInternals\IDT-assembly.asm">
       <Filter>Source Files</Filter>
     </MASM>
