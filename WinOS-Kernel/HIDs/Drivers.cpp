@@ -28,13 +28,12 @@ void MouseWait(uint8_t type) {
 
 void MouseWrite(uint8_t data) {
     MouseWait(1);
-    __outbyte(0x64, 0xD4);
+    __outbyte(0x64, 0xD4); // Next byte is for mouse
     MouseWait(1);
     __outbyte(0x60, data);
 }
 
-extern "C" {
-    void KeyboardHandler() {
+extern "C" void KeyboardHandler() {
         uint8_t scancode = __inbyte(0x60);
         if (!(scancode & 0x80)) {
             if (scancode < sizeof(scancode_to_ascii)) {
@@ -48,23 +47,19 @@ extern "C" {
         __outbyte(0x20, 0x20);
     }
 
-    void MouseHandler() {
+extern "C" void MouseHandler() {
         uint8_t status = __inbyte(0x64);
-        // Check if data is available and from the mouse (bit 5)
         if ((status & 0x01) && (status & 0x20)) {
             mouse_packet[mouse_cycle++] = __inbyte(0x60);
-
             if (mouse_cycle == 3) {
                 mouse_cycle = 0;
-
-                // Parse Packet
                 MouseLeftDown = (mouse_packet[0] & 0x01);
 
-                // Apply relative movement
+                // Apply movement (Byte 1 = X, Byte 2 = Y)
                 MouseX += (float)mouse_packet[1];
-                MouseY -= (float)mouse_packet[2]; // PS/2 Y is inverted
+                MouseY -= (float)mouse_packet[2]; // PS/2 Y is up, Screen Y is down
 
-                // Boundary Clamping
+                // Clamp to screen bounds
                 if (MouseX < 0) MouseX = 0;
                 if (MouseY < 0) MouseY = 0;
             }
@@ -73,7 +68,7 @@ extern "C" {
         __outbyte(0x20, 0x20); // EOI Master
     }
 
-    void RemapPIC() {
+extern "C" void RemapPIC() {
         __outbyte(0x20, 0x11);
         __outbyte(0xA0, 0x11);
         __outbyte(0x21, 0x20);
@@ -83,25 +78,23 @@ extern "C" {
         __outbyte(0x21, 0x01);
         __outbyte(0xA1, 0x01);
 
-        // FIX: Mask 0xF9 enables IRQ 1 (Kbd) AND IRQ 2 (Slave Bridge)
-        __outbyte(0x21, 0xF9);
-        __outbyte(0xA1, 0xEF); // Enable IRQ 12 (Mouse)
+        __outbyte(0x21, 0xF9); // 11111001 -> Kbd (1) + Cascade (2)
+        __outbyte(0xA1, 0xEF); // 11101111 -> Mouse (12)
     }
 
-    void InitMouse() {
+extern "C" void InitMouse() {
         MouseWait(1);
         __outbyte(0x64, 0xA8); // Enable Aux
         MouseWait(1);
         __outbyte(0x64, 0x20); // Get ComByte
         MouseWait(0);
-        uint8_t status = (__inbyte(0x60) | 2);
+        uint8_t status = (__inbyte(0x60) | 2); // Enable IRQ 12
         MouseWait(1);
         __outbyte(0x64, 0x60); // Set ComByte
         MouseWait(1);
         __outbyte(0x60, status);
 
-        MouseWrite(0xF4); // ENABLE DATA REPORTING (Wake up)
+        MouseWrite(0xF4); // ENABLE DATA REPORTING (The "Wake Up")
         MouseWait(0);
-        __inbyte(0x60);   // ACK
+        __inbyte(0x60);   // Read ACK
     }
-}

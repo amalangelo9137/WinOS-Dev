@@ -1,4 +1,5 @@
 #include "IDT.h"
+#include <intrin.h>
 
 // 4KB alignment for stability
 __declspec(align(4096)) IDTEntry idt[256];
@@ -30,4 +31,6 @@ void InitIDT() {
     idtr.Address = (uint64_t)&idt;
 
     LoadIDT(&idtr);
+
+	_enable(); // Enable interrupts after loading IDT
 }
