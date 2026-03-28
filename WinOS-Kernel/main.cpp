@@ -1,71 +1,33 @@
 #include "Shared.h"
-#include "Console/Console.h"
-#include "InitFS/Assets.h"
-#include "Rendering/Renderer.h"
 #include "CrucialInternals/GDT.h"
 #include "CrucialInternals/IDT.h"
+#include "Rendering/Renderer.h"
 #include <intrin.h>
 
-extern "C" void RemapPIC();
+extern float MouseX;
+extern float MouseY;
+extern bool MouseLeftDown;
 
-void SwitchBuffer(BOOT_CONFIG* config) {
-    uint32_t screenCount = config->Width * config->Height;
-    for (uint32_t i = 0; i < screenCount; i++) {
-        config->BaseAddress[i] = config->BackBuffer[i];
-    }
-}
+extern "C" void InitMouse();
 
-// Marks the function as the entry point in the PE header
 extern "C" __declspec(dllexport) void KernelMain(BOOT_CONFIG* config) {
-    if (!config || !config->BaseAddress) {
-        while (1) { __halt(); }
-    }
-
-    Console::Init(config);
-
     InitGDT();
-    RemapPIC();
     InitIDT();
+    InitMouse(); // Start the hardware
 
-    Console::Print("GDT and IDT Loaded. Type something!\n", 0x00FFFF);
+    while (true) {
+        // 1. Clear Screen
+        for (uint32_t i = 0; i < config->Width * config->Height; i++) {
+            config->BackBuffer[i] = 0x1a1a1a;
+        }
 
-    uint32_t* fb = config->BaseAddress;
-    uint32_t pps = config->PixelsPerScanLine;
-    uint32_t width = config->Width;
-    uint32_t height = config->Height;
+        // 2. Draw your UI/Square
+        uint32_t color = MouseLeftDown ? 0xFF0000 : 0xFFFFFF;
+        DrawRect((int)MouseX, (int)MouseY, 15, 15, color, config);
 
-	Console::Clear(0x000000);
+        // 3. Flip
+        SwitchBuffer(config);
 
-    // 2. Hello World Square: Bright Green
-    //uint32_t centerX = width / 2;
-    //uint32_t centerY = height / 2;
-    //uint32_t size = 50;
-
-    //for (uint32_t y = centerY - size; y < centerY + size; y++) {
-    //    for (uint32_t x = centerX - size; x < centerX + size; x++) {
-    //        fb[x + (y * pps)] = 0x00FF00;
-    //    }
-    //}
-    
-    void* bg = GetAsset("BACKGROUND", config);
-    if (bg) {
-        Console::Print("BACKGROUND found at address! Drawing...\n", 0x00FF00);
-        DrawBMP(bg, 0, 0, config->Width, config->Height, config);
+        __halt();
     }
-    else {
-        Console::Print("Error: LOGO asset not found in Table!\n", 0xFF0000);
-        // Print how many assets were actually loaded to debug
-        // Console::PrintNumber(config->Assets->Count); 
-    }
-
-    DrawWindow("WinOS-Dev : Test Window", 50, 50, 400, 300, config);
-
-    SwitchBuffer(config);
-
-    // Inside KernelMain after clearing the screen
-    Console::Print("WinOS Kernel Loaded!\n", 0xFFFFFF);
-    Console::Print("PE Image Mapping: Success\n", 0x00FF00);
-
-    // Final infinite loop
-    while (true) __halt();
 }

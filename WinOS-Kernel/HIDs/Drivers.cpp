@@ -1,6 +1,16 @@
 #include <stdint.h>
-#include <intrin.h> // REQUIRED for __inbyte and __outbyte
+#include <intrin.h>
 #include "../Console/Console.h"
+
+extern "C" int _fltused = 0; // Required for floating point usage in kernel
+
+// Global Mouse State
+float MouseX = 500.0f;
+float MouseY = 400.0f;
+bool MouseLeftDown = false;
+
+uint8_t mouse_cycle = 0;
+int8_t mouse_packet[3];
 
 // Basic QWERTY Scancode Map (Set 1)
 const char scancode_to_ascii[] = {
@@ -10,58 +20,88 @@ const char scancode_to_ascii[] = {
     'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' '
 };
 
+void MouseWait(uint8_t type) {
+    uint32_t timeout = 100000;
+    if (type == 0) while (timeout--) { if ((__inbyte(0x64) & 1) == 1) return; }
+    else while (timeout--) { if ((__inbyte(0x64) & 2) == 0) return; }
+}
+
+void MouseWrite(uint8_t data) {
+    MouseWait(1);
+    __outbyte(0x64, 0xD4);
+    MouseWait(1);
+    __outbyte(0x60, data);
+}
+
 extern "C" {
     void KeyboardHandler() {
-        // 1. Read the scancode from PS/2 Data Port
         uint8_t scancode = __inbyte(0x60);
-
-        // 2. Check if it's a "Key Press" (top bit is 0)
         if (!(scancode & 0x80)) {
             if (scancode < sizeof(scancode_to_ascii)) {
                 char c = scancode_to_ascii[scancode];
                 if (c != 0) {
                     char str[2] = { c, '\0' };
-                    Console::Print(str, 0x00FF00); // Print in green!
+                    Console::Print(str, 0x00FF00);
                 }
             }
         }
-
-        // 3. Send End of Interrupt (EOI) to Master PIC (Port 0x20)
         __outbyte(0x20, 0x20);
     }
 
     void MouseHandler() {
-        // 1. You MUST read the data port or the PS/2 controller will block future interrupts
-        uint8_t mouseData = __inbyte(0x60);
+        uint8_t status = __inbyte(0x64);
+        // Check if data is available and from the mouse (bit 5)
+        if ((status & 0x01) && (status & 0x20)) {
+            mouse_packet[mouse_cycle++] = __inbyte(0x60);
 
-        // (Mouse parsing logic goes here later)
+            if (mouse_cycle == 3) {
+                mouse_cycle = 0;
 
-        // 2. Send EOI to Slave PIC (Port 0xA0) AND Master PIC (Port 0x20)
-        __outbyte(0xA0, 0x20);
-        __outbyte(0x20, 0x20);
+                // Parse Packet
+                MouseLeftDown = (mouse_packet[0] & 0x01);
+
+                // Apply relative movement
+                MouseX += (float)mouse_packet[1];
+                MouseY -= (float)mouse_packet[2]; // PS/2 Y is inverted
+
+                // Boundary Clamping
+                if (MouseX < 0) MouseX = 0;
+                if (MouseY < 0) MouseY = 0;
+            }
+        }
+        __outbyte(0xA0, 0x20); // EOI Slave
+        __outbyte(0x20, 0x20); // EOI Master
     }
 
     void RemapPIC() {
-        // ICW1: Initialization
         __outbyte(0x20, 0x11);
         __outbyte(0xA0, 0x11);
-
-        // ICW2: Vector Offsets (Map IRQ0-7 to 32-39, IRQ8-15 to 40-47)
         __outbyte(0x21, 0x20);
         __outbyte(0xA1, 0x28);
-
-        // ICW3: Wiring
         __outbyte(0x21, 0x04);
         __outbyte(0xA1, 0x02);
-
-        // ICW4: Mode (8086 mode)
         __outbyte(0x21, 0x01);
         __outbyte(0xA1, 0x01);
 
-        // Unmask Keyboard (IRQ1) and Mouse (IRQ12)
-        // 0xFD = 11111101 (Only IRQ1 enabled)
-        // 0xEF = 11101111 (Only IRQ12 enabled on slave)
-        __outbyte(0x21, 0xFD);
-        __outbyte(0xA1, 0xEF);
+        // FIX: Mask 0xF9 enables IRQ 1 (Kbd) AND IRQ 2 (Slave Bridge)
+        __outbyte(0x21, 0xF9);
+        __outbyte(0xA1, 0xEF); // Enable IRQ 12 (Mouse)
+    }
+
+    void InitMouse() {
+        MouseWait(1);
+        __outbyte(0x64, 0xA8); // Enable Aux
+        MouseWait(1);
+        __outbyte(0x64, 0x20); // Get ComByte
+        MouseWait(0);
+        uint8_t status = (__inbyte(0x60) | 2);
+        MouseWait(1);
+        __outbyte(0x64, 0x60); // Set ComByte
+        MouseWait(1);
+        __outbyte(0x60, status);
+
+        MouseWrite(0xF4); // ENABLE DATA REPORTING (Wake up)
+        MouseWait(0);
+        __inbyte(0x60);   // ACK
     }
 }

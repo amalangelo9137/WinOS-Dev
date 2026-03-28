@@ -1,6 +1,12 @@
 #pragma once
 #include "Shared.h"
 
+// Fills the screen with a given colour.
+void Clear(uint32_t color, BOOT_CONFIG* config);
+
+// Applies the backbuffer to the main framebuffer.
+void SwitchBuffer(BOOT_CONFIG* config);
+
 // Draw a rectangle with given x position, y position, width and height.
 void DrawRect(int x, int y, int width, int height, uint32_t color, BOOT_CONFIG* config);
 
