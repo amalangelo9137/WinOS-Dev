@@ -1,235 +1,246 @@
-#include "Shared.h" // Assumes BOOT_CONFIG is here
+#include "Shared.h"
 #include <intrin.h>
 
-extern "C" int _fltused = 0; // Required by MSVC for float math
+#include "HIDs.h"
 
-#define CURSOR_WIDTH  28
-#define CURSOR_HEIGHT 38
+volatile int MouseX = 0;
+volatile int MouseY = 0;
+volatile bool MouseLeftDown = false;
+volatile bool MouseStateDirty = false;
 
-static const uint32_t CursorBitmap[] = {
-  0xff000000, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff36a367, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff36a466, 0xff091d12, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb470, 0xff3cb46f, 0xff35a564, 0xff091d11, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb470, 0xff3cb46f, 0xff3bb56e, 0xff3bb66d, 0xff35a662, 0xff091e11, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb370, 0xff3cb46f, 0xff3bb56e, 0xff3bb66d, 0xff3bb66c, 0xff3bb76b, 0xff34a85f, 0xff091e11, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb370, 0xff3cb46f, 0xff3bb56e, 0xff3bb56d, 0xff3bb66c, 0xff3bb76b, 0xff3ab86a, 0xff3ab868, 0xff34a95e, 0xff091e10, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb371, 0xff3cb470, 0xff3bb56e, 0xff3bb56d, 0xff3bb66c, 0xff3bb76b, 0xff3bb86a, 0xff3ab869, 0xff3ab967, 0xff3aba66, 0xff34a95c, 0xff091e10, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb371, 0xff3cb470, 0xff3bb56f, 0xff3bb56e, 0xff3bb66c, 0xff3bb76b, 0xff3bb76a, 0xff3ab869, 0xff3ab968, 0xff3aba66, 0xff3aba65, 0xff39bb64, 0xff34ab59, 0xff091e0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb371, 0xff3cb470, 0xff3cb46f, 0xff3bb56e, 0xff3bb66d, 0xff3bb76b, 0xff3bb76a, 0xff3ab869, 0xff3ab968, 0xff3ab967, 0xff3aba65, 0xff39bb64, 0xff39bc63, 0xff39bc61, 0xff34ac57, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb470, 0xff3cb46f, 0xff3bb56e, 0xff3bb66d, 0xff3bb66c, 0xff3bb76a, 0xff3ab869, 0xff3ab968, 0xff3ab967, 0xff3aba66, 0xff39bb64, 0xff39bb63, 0xff39bc62, 0xff39bd60, 0xff38bd5f, 0xff33ad55, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3cb46f, 0xff3bb56e, 0xff3bb66d, 0xff3bb66c, 0xff3bb76b, 0xff3ab869, 0xff3ab868, 0xff3ab967, 0xff3aba66, 0xff39bb64, 0xff39bb63, 0xff39bc62, 0xff39bd61, 0xff38bd5f, 0xff38be5e, 0xff38bf5c, 0xff33ae53, 0xff091f0e, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3bb56e, 0xff3bb56d, 0xff3bb66c, 0xff3bb76b, 0xff3ab86a, 0xff3ab868, 0xff3ab967, 0xff3aba66, 0xff3aba65, 0xff39bb63, 0xff39bc62, 0xff39bd61, 0xff39bd5f, 0xff38be5e, 0xff38bf5d, 0xff38bf5b, 0xff38c05a, 0xff32b050, 0xff091f0e, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3bb56d, 0xff3bb66c, 0xff3bb76b, 0xff3bb86a, 0xff3ab869, 0xff3ab967, 0xff3aba66, 0xff3aba65, 0xff39bb64, 0xff39bc62, 0xff39bc61, 0xff39bd60, 0xff38be5e, 0xff38be5d, 0xff38bf5b, 0xff38c05a, 0xff37c159, 0xff37c157, 0xff32b14e, 0xff08200d, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3bb66d, 0xff3bb76b, 0xff3bb76a, 0xff3ab869, 0xff3ab968, 0xff3ab967, 0xff3aba65, 0xff39bb64, 0xff39bc63, 0xff39bc61, 0xff39bd60, 0xff38be5f, 0xff38be5d, 0xff38bf5c, 0xff38c05a, 0xff37c059, 0xff37c157, 0xff37c256, 0xff37c254, 0xff31b24b, 0xff08200d, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3bb76b, 0xff3bb76a, 0xff3ab869, 0xff3ab968, 0xff3ab967, 0xff3aba65, 0xff39bb64, 0xff39bb63, 0xff39bc61, 0xff39bd60, 0xff38be5f, 0xff38be5d, 0xff38bf5c, 0xff38c05b, 0xff37c059, 0xff37c158, 0xff37c256, 0xff37c255, 0xff36c353, 0xff36c451, 0xff31b349, 0xff08200c, 0xff000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3bb76b, 0xff3ab869, 0xff3ab968, 0xff3ab967, 0xff3aba66, 0xff39bb64, 0xff39bb63, 0xff39bc62, 0xff39bd60, 0xff38bd5f, 0xff38be5e, 0xff38bf5c, 0xff38c05b, 0xff37c059, 0xff37c158, 0xff37c256, 0xff37c255, 0xff36c353, 0xff36c352, 0xff36c450, 0xff36c54e, 0xff30b445, 0xff08200c, 0xff000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3ab869, 0xff3ab868, 0xff3ab967, 0xff3aba66, 0xff39bb65, 0xff39bb63, 0xff39bc62, 0xff39bd61, 0xff38bd5f, 0xff38be5e, 0xff38bf5c, 0xff38bf5b, 0xff37c05a, 0xff37c158, 0xff37c157, 0xff37c255, 0xff36c353, 0xff36c352, 0xff36c450, 0xff36c54e, 0xff35c54d, 0xff35c64b, 0xff30b542, 0xff08200b, 0xff000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3ab869, 0xff3ab967, 0xff3aba66, 0xff3aba65, 0xff39bb63, 0xff39bc62, 0xff39bd61, 0xff39bd5f, 0xff33ad55, 0xff0a2311, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000,
-    0xff000000, 0xff000000, 0xff3ab967, 0xff3aba66, 0xff3aba65, 0xff39bb64, 0xff39bc62, 0xff39bc61, 0xff39bd60, 0xff33ad55, 0xff091f0f, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000, 0xff000000,
-    0xff000000, 0xff000000, 0xff3ab967, 0xff3aba65, 0xff39bb64, 0xff39bc63, 0xff39bc61, 0xff39bd60, 0xff33ad56, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff3aba65, 0xff39bb64, 0xff39bb63, 0xff39bc62, 0xff39bd60, 0xff33ad56, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff39bb64, 0xff39bb63, 0xff39bc62, 0xff39bd60, 0xff33ac56, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff39bb63, 0xff39bc62, 0xff39bd61, 0xff34ac56, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff39bc62, 0xff39bd61, 0xff34ac57, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff39bc61, 0xff34ac57, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff34ac57, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff091f0f, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0xff000000, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
-};
+static uint8_t MouseCycle = 0;
+static int8_t MousePacket[3];
+static bool ShiftDown = false;
+static bool CapsLockOn = false;
+static KeyboardInputEvent KeyboardQueue[32] = {};
+static volatile uint32_t KeyboardReadIndex = 0;
+static volatile uint32_t KeyboardWriteIndex = 0;
 
-// --- Mouse Globals ---
-float MouseX = 500.0f;
-float MouseY = 400.0f;
-int LastSavedX = 500;
-int LastSavedY = 400;
-int MouseSensitivityMultiplier = 2;
-bool MouseLeftDown = false;
-
-uint32_t MouseBackingStore[28 * 38];
-static uint8_t mouse_cycle = 0;
-static int8_t mouse_packet[3];
-
-// This is the pointer we set in main.cpp
 extern "C" BOOT_CONFIG* GlobalConfig;
 
-// --- Internal Helper Functions ---
+static void SyncBootMouseState() {
+    if (GlobalConfig == nullptr || GlobalConfig->Mouse == nullptr) return;
 
-void MouseWait(uint8_t type) {
+    GlobalConfig->Mouse->X = MouseX;
+    GlobalConfig->Mouse->Y = MouseY;
+    GlobalConfig->Mouse->Left = MouseLeftDown;
+    GlobalConfig->Mouse->Right = false;
+}
+
+static void MouseWait(uint8_t type) {
     uint32_t timeout = 100000;
     if (type == 0) {
-        while (timeout-- && !(__inbyte(0x64) & 1)); // Wait for data to be ready
+        while (timeout-- && ((__inbyte(0x64) & 1) == 0)) {
+        }
     }
     else {
-        while (timeout-- && (__inbyte(0x64) & 2));  // Wait for port to be empty
+        while (timeout-- && (__inbyte(0x64) & 2)) {
+        }
     }
 }
 
-void MouseWrite(uint8_t data) {
+static void MouseWrite(uint8_t data) {
     MouseWait(1);
-    __outbyte(0x64, 0xD4); // Tell controller we are talking to the mouse
+    __outbyte(0x64, 0xD4);
     MouseWait(1);
     __outbyte(0x60, data);
 }
 
-uint8_t MouseRead() {
+static uint8_t MouseRead() {
     MouseWait(0);
     return __inbyte(0x60);
 }
 
-// Erases the mouse by putting the original background pixels back
-void RestoreMouse() {
-    if (!GlobalConfig) return;
-    for (int y = 0; y < CURSOR_HEIGHT; y++) {
-        for (int x = 0; x < CURSOR_WIDTH; x++) {
-            int tx = LastSavedX + x;
-            int ty = LastSavedY + y;
-            if (tx >= 0 && tx < (int)GlobalConfig->Width && ty >= 0 && ty < (int)GlobalConfig->Height) {
-                uint32_t bgPixel = MouseBackingStore[x + (y * CURSOR_WIDTH)];
-                GlobalConfig->BackBuffer[tx + (ty * GlobalConfig->PixelsPerScanLine)] = bgPixel;
-                GlobalConfig->BaseAddress[tx + (ty * GlobalConfig->PixelsPerScanLine)] = bgPixel;
-            }
-        }
+static void PushKeyboardEvent(uint8_t type, char character) {
+    uint32_t nextWriteIndex = (KeyboardWriteIndex + 1) % 32;
+    if (nextWriteIndex == KeyboardReadIndex) {
+        return;
     }
+
+    KeyboardQueue[KeyboardWriteIndex].Type = type;
+    KeyboardQueue[KeyboardWriteIndex].Character = character;
+    KeyboardWriteIndex = nextWriteIndex;
 }
 
-// Saves what's currently under the new position and draws the mouse
-extern "C" void SaveAndDrawMouse(int newX, int newY) {
-    if (!GlobalConfig) return;
-
-    // 1. Capture the background area (28x38)
-    for (int y = 0; y < CURSOR_HEIGHT; y++) {
-        for (int x = 0; x < CURSOR_WIDTH; x++) {
-            int tx = newX + x;
-            int ty = newY + y;
-            if (tx >= 0 && tx < (int)GlobalConfig->Width && ty >= 0 && ty < (int)GlobalConfig->Height) {
-                // IMPORTANT: Ensure MouseBackingStore is at least [28 * 38] in size!
-                MouseBackingStore[x + (y * CURSOR_WIDTH)] = GlobalConfig->BackBuffer[tx + (ty * GlobalConfig->PixelsPerScanLine)];
-            }
-        }
-    }
-
-    // 2. Draw the cursor using Alpha Blending (Simple On/Off)
-    for (int y = 0; y < CURSOR_HEIGHT; y++) {
-        for (int x = 0; x < CURSOR_WIDTH; x++) {
-            uint32_t cursorPixel = CursorBitmap[x + (y * CURSOR_WIDTH)];
-
-            // Check the Alpha Channel (the most significant 8 bits)
-            // If Alpha > 0, it's not transparent
-            if ((cursorPixel & 0xFF000000) != 0) {
-                int tx = newX + x;
-                int ty = newY + y;
-
-                if (tx >= 0 && tx < (int)GlobalConfig->Width && ty >= 0 && ty < (int)GlobalConfig->Height) {
-                    // Extract just the RGB part (ignoring the Alpha byte)
-                    uint32_t color = cursorPixel & 0x00FFFFFF;
-
-                    GlobalConfig->BackBuffer[tx + (ty * GlobalConfig->PixelsPerScanLine)] = color;
-                    GlobalConfig->BaseAddress[tx + (ty * GlobalConfig->PixelsPerScanLine)] = color;
-                }
-            }
-        }
-    }
-
-    LastSavedX = newX;
-    LastSavedY = newY;
+static char TranslateLetter(char lowerCase, bool shifted) {
+    bool upperCase = CapsLockOn ? !shifted : shifted;
+    return upperCase ? (char)(lowerCase - ('a' - 'A')) : lowerCase;
 }
 
-// --- The Hardware Handlers ---
+static char TranslateScancode(uint8_t scancode, bool shifted) {
+    switch (scancode) {
+    case 0x02: return shifted ? '!' : '1';
+    case 0x03: return shifted ? '@' : '2';
+    case 0x04: return shifted ? '#' : '3';
+    case 0x05: return shifted ? '$' : '4';
+    case 0x06: return shifted ? '%' : '5';
+    case 0x07: return shifted ? '^' : '6';
+    case 0x08: return shifted ? '&' : '7';
+    case 0x09: return shifted ? '*' : '8';
+    case 0x0A: return shifted ? '(' : '9';
+    case 0x0B: return shifted ? ')' : '0';
+    case 0x0C: return shifted ? '_' : '-';
+    case 0x0D: return shifted ? '+' : '=';
+    case 0x10: return TranslateLetter('q', shifted);
+    case 0x11: return TranslateLetter('w', shifted);
+    case 0x12: return TranslateLetter('e', shifted);
+    case 0x13: return TranslateLetter('r', shifted);
+    case 0x14: return TranslateLetter('t', shifted);
+    case 0x15: return TranslateLetter('y', shifted);
+    case 0x16: return TranslateLetter('u', shifted);
+    case 0x17: return TranslateLetter('i', shifted);
+    case 0x18: return TranslateLetter('o', shifted);
+    case 0x19: return TranslateLetter('p', shifted);
+    case 0x1A: return shifted ? '{' : '[';
+    case 0x1B: return shifted ? '}' : ']';
+    case 0x1E: return TranslateLetter('a', shifted);
+    case 0x1F: return TranslateLetter('s', shifted);
+    case 0x20: return TranslateLetter('d', shifted);
+    case 0x21: return TranslateLetter('f', shifted);
+    case 0x22: return TranslateLetter('g', shifted);
+    case 0x23: return TranslateLetter('h', shifted);
+    case 0x24: return TranslateLetter('j', shifted);
+    case 0x25: return TranslateLetter('k', shifted);
+    case 0x26: return TranslateLetter('l', shifted);
+    case 0x27: return shifted ? ':' : ';';
+    case 0x28: return shifted ? '"' : '\'';
+    case 0x29: return shifted ? '~' : '`';
+    case 0x2B: return shifted ? '|' : '\\';
+    case 0x2C: return TranslateLetter('z', shifted);
+    case 0x2D: return TranslateLetter('x', shifted);
+    case 0x2E: return TranslateLetter('c', shifted);
+    case 0x2F: return TranslateLetter('v', shifted);
+    case 0x30: return TranslateLetter('b', shifted);
+    case 0x31: return TranslateLetter('n', shifted);
+    case 0x32: return TranslateLetter('m', shifted);
+    case 0x33: return shifted ? '<' : ',';
+    case 0x34: return shifted ? '>' : '.';
+    case 0x35: return shifted ? '?' : '/';
+    case 0x39: return ' ';
+    default: return 0;
+    }
+}
 
 extern "C" void MouseHandler() {
-    uint8_t status = __inbyte(0x64);
-    // Data must be available (bit 0) and from the mouse (bit 5)
-    if (!(status & 0x01) || !(status & 0x20)) return;
+    const uint8_t status = __inbyte(0x64);
+    if ((status & 0x01) == 0 || (status & 0x20) == 0) return;
 
-    uint8_t data = __inbyte(0x60);
-    if (mouse_cycle == 0 && !(data & 0x08)) return; // Sync bit check
+    const uint8_t data = __inbyte(0x60);
+    if (MouseCycle == 0 && (data & 0x08) == 0) return;
 
-    mouse_packet[mouse_cycle++] = data;
+    MousePacket[MouseCycle++] = (int8_t)data;
 
-    if (mouse_cycle == 3) {
-        mouse_cycle = 0;
+    if (MouseCycle != 3) return;
 
-        // 1. Heal the old spot
-        RestoreMouse();
+    MouseCycle = 0;
 
-        // 2. Calculate New Position
-        int32_t dx = (int8_t)mouse_packet[1];
-        int32_t dy = (int8_t)mouse_packet[2];
-        MouseLeftDown = (mouse_packet[0] & 0x01);
+    if ((MousePacket[0] & 0xC0) != 0) return;
 
-        MouseX += (float)dx;
-        MouseY -= (float)dy;
+    MouseLeftDown = (MousePacket[0] & 0x01) != 0;
+    MouseX += (int)MousePacket[1];
+    MouseY -= (int)MousePacket[2];
 
-        // Bounds Clamping
+    if (GlobalConfig != nullptr) {
         if (MouseX < 0) MouseX = 0;
         if (MouseY < 0) MouseY = 0;
-        if (MouseX > GlobalConfig->Width - 16) MouseX = (float)GlobalConfig->Width - 16;
-        if (MouseY > GlobalConfig->Height - 16) MouseY = (float)GlobalConfig->Height - 16;
-
-        // 3. Paint the new spot
-        SaveAndDrawMouse((int)MouseX * MouseSensitivityMultiplier, (int)MouseY * MouseSensitivityMultiplier);
+        if (MouseX > (int)GlobalConfig->Width - 1) MouseX = (int)GlobalConfig->Width - 1;
+        if (MouseY > (int)GlobalConfig->Height - 1) MouseY = (int)GlobalConfig->Height - 1;
     }
+
+    SyncBootMouseState();
+    MouseStateDirty = true;
 }
 
 extern "C" void KeyboardHandler() {
-    __inbyte(0x60); // ACK the interrupt so the controller doesn't jam
+    uint8_t scancode = __inbyte(0x60);
+
+    if (scancode == 0x2A || scancode == 0x36) {
+        ShiftDown = true;
+        return;
+    }
+
+    if (scancode == 0xAA || scancode == 0xB6) {
+        ShiftDown = false;
+        return;
+    }
+
+    if ((scancode & 0x80) != 0) {
+        return;
+    }
+
+    if (scancode == 0x3A) {
+        CapsLockOn = !CapsLockOn;
+        return;
+    }
+
+    if (scancode == 0x0E) {
+        PushKeyboardEvent(KeyboardInputBackspace, 0);
+        return;
+    }
+
+    if (scancode == 0x1C) {
+        PushKeyboardEvent(KeyboardInputEnter, '\n');
+        return;
+    }
+
+    char translated = TranslateScancode(scancode, ShiftDown);
+    if (translated != 0) {
+        PushKeyboardEvent(KeyboardInputCharacter, translated);
+    }
 }
 
 extern "C" void RemapPIC() {
     __outbyte(0x20, 0x11);
     __outbyte(0xA0, 0x11);
-    __outbyte(0x21, 0x20); // Master Offset 32
-    __outbyte(0xA1, 0x28); // Slave Offset 40
+    __outbyte(0x21, 0x20);
+    __outbyte(0xA1, 0x28);
     __outbyte(0x21, 0x04);
     __outbyte(0xA1, 0x02);
     __outbyte(0x21, 0x01);
     __outbyte(0xA1, 0x01);
 
-    __outbyte(0x21, 0xF9); // Unmask IRQ 1 (Kbd) and 2 (Cascade)
-    __outbyte(0xA1, 0xEF); // Unmask IRQ 12 (Mouse)
+    __outbyte(0x21, 0xF9);
+    __outbyte(0xA1, 0xEF);
 }
 
 extern "C" void InitMouse() {
     RemapPIC();
+    MouseCycle = 0;
 
-    // 1. Enable Auxiliary Device
     MouseWait(1);
     __outbyte(0x64, 0xA8);
 
-    // 2. Enable Interrupts in Command Byte
     MouseWait(1);
-    __outbyte(0x64, 0x20); // Get Command Byte
-    uint8_t status = MouseRead() | 2;
+    __outbyte(0x64, 0x20);
+    const uint8_t controllerStatus = MouseRead() | 0x02;
     MouseWait(1);
-    __outbyte(0x64, 0x60); // Set Command Byte
-    __outbyte(0x60, status);
+    __outbyte(0x64, 0x60);
+    __outbyte(0x60, controllerStatus);
 
-    // 3. HARDWARE RESET (The "Mercy" Step)
-    // This wakes up the external USB-emulated mouse
     MouseWrite(0xFF);
-    MouseRead(); // Acknowledge Reset
-
-    // 4. Default Settings
-    MouseWrite(0xF6); // Set Defaults
     MouseRead();
 
-    // 5. Set Sample Rate (Crucial for real hardware)
+    MouseWrite(0xF6);
+    MouseRead();
+
     MouseWrite(0xF3);
     MouseRead();
-    MouseWrite(256); // 256 samples/sec
+    MouseWrite(200);
     MouseRead();
 
-    // 6. Enable Data Reporting
     MouseWrite(0xF4);
     MouseRead();
+
+    SyncBootMouseState();
+    MouseStateDirty = true;
+}
+
+bool PollKeyboardInput(KeyboardInputEvent* inputEvent) {
+    if (inputEvent == nullptr || KeyboardReadIndex == KeyboardWriteIndex) {
+        return false;
+    }
+
+    *inputEvent = KeyboardQueue[KeyboardReadIndex];
+    KeyboardReadIndex = (KeyboardReadIndex + 1) % 32;
+    return true;
 }
