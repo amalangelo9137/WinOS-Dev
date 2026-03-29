@@ -37,6 +37,7 @@
     <ClInclude Include="CrucialInternals\IDT.h" />
     <ClInclude Include="InitFS\Assets.h" />
     <ClInclude Include="Rendering\Renderer.h" />
+    <ClInclude Include="Rendering\Window.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="CrucialInternals\IDT-assembly.asm" />

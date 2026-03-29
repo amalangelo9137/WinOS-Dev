@@ -65,6 +65,9 @@
     <ClInclude Include="InitFS\Assets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rendering\Window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="CrucialInternals\IDT-assembly.asm">

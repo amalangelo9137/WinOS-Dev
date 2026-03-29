@@ -6,9 +6,6 @@ extern "C" int _fltused = 0; // Required by MSVC for float math
 #define CURSOR_WIDTH  28
 #define CURSOR_HEIGHT 38
 
-// The exact pixel map of your green arrow
-// 0x000000 = Transparent
-// 0x48B86E = The Green from your BMP
 static const uint32_t CursorBitmap[] = {
   0xff000000, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0xff000000, 0xff000000, 0xff000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
@@ -55,6 +52,7 @@ float MouseX = 500.0f;
 float MouseY = 400.0f;
 int LastSavedX = 500;
 int LastSavedY = 400;
+int MouseSensitivityMultiplier = 2;
 bool MouseLeftDown = false;
 
 uint32_t MouseBackingStore[28 * 38];
@@ -68,15 +66,24 @@ extern "C" BOOT_CONFIG* GlobalConfig;
 
 void MouseWait(uint8_t type) {
     uint32_t timeout = 100000;
-    if (type == 0) while (timeout--) { if ((__inbyte(0x64) & 1) == 1) return; }
-    else while (timeout--) { if ((__inbyte(0x64) & 2) == 0) return; }
+    if (type == 0) {
+        while (timeout-- && !(__inbyte(0x64) & 1)); // Wait for data to be ready
+    }
+    else {
+        while (timeout-- && (__inbyte(0x64) & 2));  // Wait for port to be empty
+    }
 }
 
 void MouseWrite(uint8_t data) {
     MouseWait(1);
-    __outbyte(0x64, 0xD4);
+    __outbyte(0x64, 0xD4); // Tell controller we are talking to the mouse
     MouseWait(1);
     __outbyte(0x60, data);
+}
+
+uint8_t MouseRead() {
+    MouseWait(0);
+    return __inbyte(0x60);
 }
 
 // Erases the mouse by putting the original background pixels back
@@ -170,7 +177,7 @@ extern "C" void MouseHandler() {
         if (MouseY > GlobalConfig->Height - 16) MouseY = (float)GlobalConfig->Height - 16;
 
         // 3. Paint the new spot
-        SaveAndDrawMouse((int)MouseX, (int)MouseY);
+        SaveAndDrawMouse((int)MouseX * MouseSensitivityMultiplier, (int)MouseY * MouseSensitivityMultiplier);
     }
 }
 
@@ -194,21 +201,35 @@ extern "C" void RemapPIC() {
 
 extern "C" void InitMouse() {
     RemapPIC();
-    while (__inbyte(0x64) & 1) { __inbyte(0x60); } // Clear buffer
 
+    // 1. Enable Auxiliary Device
     MouseWait(1);
     __outbyte(0x64, 0xA8);
+
+    // 2. Enable Interrupts in Command Byte
     MouseWait(1);
-    __outbyte(0x64, 0x20);
-    MouseWait(0);
-    uint8_t status = (__inbyte(0x60) | 2);
+    __outbyte(0x64, 0x20); // Get Command Byte
+    uint8_t status = MouseRead() | 2;
     MouseWait(1);
-    __outbyte(0x64, 0x60);
-    MouseWait(1);
+    __outbyte(0x64, 0x60); // Set Command Byte
     __outbyte(0x60, status);
 
-    MouseWrite(0xF6); // Default settings
-    MouseWait(0); __inbyte(0x60);
-    MouseWrite(0xF4); // Enable reporting
-    MouseWait(0); __inbyte(0x60);
+    // 3. HARDWARE RESET (The "Mercy" Step)
+    // This wakes up the external USB-emulated mouse
+    MouseWrite(0xFF);
+    MouseRead(); // Acknowledge Reset
+
+    // 4. Default Settings
+    MouseWrite(0xF6); // Set Defaults
+    MouseRead();
+
+    // 5. Set Sample Rate (Crucial for real hardware)
+    MouseWrite(0xF3);
+    MouseRead();
+    MouseWrite(256); // 256 samples/sec
+    MouseRead();
+
+    // 6. Enable Data Reporting
+    MouseWrite(0xF4);
+    MouseRead();
 }

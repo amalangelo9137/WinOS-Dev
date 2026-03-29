@@ -31,6 +31,8 @@ extern "C" __declspec(dllexport) void KernelMain(BOOT_CONFIG* config) {
 	void* bg = GetAsset("BACKGROUND", config);
     if (bg) DrawBMP(bg, 0, 0, config->Width, config->Height, config);
 
+    DrawWindow("Test Window", 50, 50, 853, 480, config);
+
 	SwitchBuffer(config);
 
     // 4. Initial capture of the background
