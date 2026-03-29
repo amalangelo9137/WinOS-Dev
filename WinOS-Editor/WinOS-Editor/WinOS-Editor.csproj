@@ -1,5 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,19 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="EngineCore.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Remove="WinOS-Logo.png" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="DotNetProjects.Extended.Wpf.Toolkit" Version="5.0.129" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="WinOS-Logo.png" />
   </ItemGroup>
-
 </Project>

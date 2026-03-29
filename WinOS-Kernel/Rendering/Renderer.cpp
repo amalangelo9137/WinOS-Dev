@@ -1,12 +1,14 @@
 #include "Renderer.h"
+#include <stddef.h>
 #include <intrin.h> // Required for __movsd
 
 void SwitchBuffer(BOOT_CONFIG* config) {
-    // __movsd copies 4 bytes at a time using hardware acceleration
-    // Number of dwords = (Width * Height)
+    if (config == nullptr) return;
+
+    const size_t pixelCount = (size_t)config->PixelsPerScanLine * (size_t)config->Height;
     __movsd((unsigned long*)config->BaseAddress,
         (unsigned long*)config->BackBuffer,
-        (config->Width * config->Height));
+        pixelCount);
 }
 
 void Clear(uint32_t color, BOOT_CONFIG* config) {

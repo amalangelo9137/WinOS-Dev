@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Apps\Wdexe.cpp" />
     <ClCompile Include="Console\Console.cpp" />
     <ClCompile Include="CrucialInternals\GDT.cpp" />
     <ClCompile Include="CrucialInternals\IDT.cpp" />
@@ -30,13 +31,18 @@
     <ClCompile Include="Rendering\Shapes.cpp" />
     <ClCompile Include="Rendering\Text.cpp" />
     <ClCompile Include="Rendering\Window.cpp" />
+    <ClCompile Include="Rendering\WindowManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Apps\Wdexe.h" />
     <ClInclude Include="Console\Console.h" />
     <ClInclude Include="CrucialInternals\GDT.h" />
     <ClInclude Include="CrucialInternals\IDT.h" />
+    <ClInclude Include="HIDs\HIDs.h" />
     <ClInclude Include="InitFS\Assets.h" />
     <ClInclude Include="Rendering\Renderer.h" />
+    <ClInclude Include="Rendering\Window.h" />
+    <ClInclude Include="Rendering\WindowManager.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="CrucialInternals\IDT-assembly.asm" />

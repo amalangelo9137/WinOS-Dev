@@ -15,7 +15,7 @@ extern CONST UINT32 _gUefiDriverRevision = 0;
 CHAR8* gEfiCallerBaseName = "WinOS-Dev";
 
 // Helper to load raw bytes from USB
-void* LoadFileIntoRAM(EFI_FILE* Directory, CHAR16* Path) {
+void* LoadFileIntoRAM(EFI_FILE* Directory, CHAR16* Path, UINTN* LoadedSize) {
     EFI_FILE* LoadedFile;
     EFI_STATUS Status = Directory->Open(Directory, &LoadedFile, Path, EFI_FILE_MODE_READ, 0);
     if (EFI_ERROR(Status)) return NULL;
@@ -36,6 +36,9 @@ void* LoadFileIntoRAM(EFI_FILE* Directory, CHAR16* Path) {
     void* FileBuffer = (void*)FileBufferAddr;
     Status = LoadedFile->Read(LoadedFile, &FileSize, FileBuffer);
     LoadedFile->Close(LoadedFile);
+    if (LoadedSize != NULL) {
+        *LoadedSize = FileSize;
+    }
     return FileBuffer;
 }
 
@@ -58,7 +61,7 @@ EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Syste
 
     // 3. Asset Index Parsing
     Print(L"Parsing index.wfs...\n");
-    void* IndexRaw = LoadFileIntoRAM(RootDir, L"\\index.wfs");
+    void* IndexRaw = LoadFileIntoRAM(RootDir, L"\\index.wfs", NULL);
     ASSET_TABLE* Table;
     gBS->AllocatePool(EfiLoaderData, sizeof(ASSET_TABLE), (void**)&Table);
     gBS->AllocatePool(EfiLoaderData, sizeof(ASSET_ENTRY) * 50, (void**)&Table->Entries);
@@ -89,10 +92,12 @@ EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Syste
             }
             UPath[uIdx] = L'\0';
 
-            void* AssetAddr = LoadFileIntoRAM(RootDir, UPath);
+            UINTN AssetSize = 0;
+            void* AssetAddr = LoadFileIntoRAM(RootDir, UPath, &AssetSize);
             if (AssetAddr) {
                 AsciiStrCpyS(Table->Entries[Table->Count].Name, 32, NameStart);
                 Table->Entries[Table->Count].Address = AssetAddr;
+                Table->Entries[Table->Count].Size = (UINT32)AssetSize;
                 Table->Count++;
             }
         }
@@ -114,7 +119,7 @@ EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Syste
     BootConfig.BackBuffer = (uint32_t*)BBAddr;
 
     // Load System Font
-    VOID* FontFileBuffer = LoadFileIntoRAM(RootDir, L"font.psf");
+    VOID* FontFileBuffer = LoadFileIntoRAM(RootDir, L"font.psf", NULL);
     if (FontFileBuffer == NULL) {
         Print(L"bro place the font at the root directory :) (name it font)\n");
         return EFI_NOT_FOUND;
@@ -123,7 +128,7 @@ EFI_STATUS EFIAPI UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Syste
 
     // 5. Load & Map KERNEL.EXE
     Print(L"Loading Kernel...\n");
-    void* KernelRaw = LoadFileIntoRAM(RootDir, L"\\KERNEL");
+    void* KernelRaw = LoadFileIntoRAM(RootDir, L"\\KERNEL", NULL);
     if (!KernelRaw) { Print(L"KERNEL not found!\n"); while (1); }
 
     EFI_IMAGE_DOS_HEADER* DOSHeader = (EFI_IMAGE_DOS_HEADER*)KernelRaw;
